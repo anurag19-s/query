@@ -16,23 +16,39 @@ function Login({ setUser }) {
 
     try {
       const endpoint = isRegister ? '/api/register' : '/api/login';
-      const payload = isRegister 
-        ? { email, password, name, role: 'student' }
+      const payload = isRegister
+        ? { email, password, name }
         : { email, password };
 
-      const response = await axios.post(`http://localhost:5000${endpoint}`, payload);
+      const response = await axios.post(
+        `http://localhost:5000${endpoint}`,
+        payload
+      );
 
       if (isRegister) {
         alert('Registration successful! Please login.');
         setIsRegister(false);
+        setName('');
       } else {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         setUser(response.data.user);
-        navigate('/dashboard');
+
+        // Redirect based on role
+        if (response.data.user.role === 'student') {
+          navigate('/student');
+        } else if (response.data.user.role === 'department') {
+          navigate('/department');
+        } else if (response.data.user.role === 'admin') {
+          navigate('/admin');
+        }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred');
+      setError(
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        'An error occurred'
+      );
     }
   };
 
@@ -40,57 +56,101 @@ function Login({ setUser }) {
     <div style={styles.container}>
       <div style={styles.card}>
         <h1 style={styles.title}>QueryConnect</h1>
-        <p style={styles.subtitle}>Student Query Management System</p>
+        <p style={styles.subtitle}>
+          {isRegister ? 'Create Account' : 'Welcome back!'}
+        </p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           {isRegister && (
+            <div style={styles.field}>
+              <label style={styles.label}>Full Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                style={styles.input}
+                placeholder="Enter your name"
+                required
+              />
+            </div>
+          )}
+
+          <div style={styles.field}>
+            <label style={styles.label}>Email Address</label>
             <input
-              type="text"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               style={styles.input}
+              placeholder="you@example.com"
               required
             />
-          )}
-          
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
-            required
-          />
-          
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-            required
-          />
+          </div>
 
-          {error && <p style={styles.error}>{error}</p>}
+          <div style={styles.field}>
+            <label style={styles.label}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={styles.input}
+              placeholder="••••••"
+              required
+            />
+          </div>
 
-          <button type="submit" style={styles.button}>
+          {error && <div style={styles.error}>{error}</div>}
+
+          <button type="submit" style={styles.primaryButton}>
             {isRegister ? 'Register' : 'Login'}
           </button>
         </form>
 
-        <p style={styles.toggle}>
+        <p style={styles.switchText}>
           {isRegister ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <span onClick={() => setIsRegister(!isRegister)} style={styles.link}>
+          <span
+            style={styles.link}
+            onClick={() => {
+              setIsRegister(!isRegister);
+              setError('');
+              setName('');
+            }}
+          >
             {isRegister ? 'Login' : 'Register'}
           </span>
         </p>
 
-        <div style={styles.testAccounts}>
-          <p style={styles.testTitle}>Test Accounts:</p>
-          <p>Student: student@test.com / 123456</p>
-          <p>Department: dept@test.com / 123456</p>
-          <p>Admin: admin@test.com / 123456</p>
+        <p style={styles.switchText}>
+          Or{' '}
+          <span
+            style={styles.link}
+            onClick={() => navigate('/guest')}
+          >
+            continue as guest
+          </span>
+        </p>
+
+        {/* Test Accounts */}
+        <div style={styles.infoBox}>
+          <p style={styles.infoTitle}>🧪 Test Accounts:</p>
+          <p style={styles.infoItem}>👨‍🎓 Student: ankush.mahadole.mca25@mespune.in / 123456</p>
+          <p style={styles.infoItem}>👨‍🎓 Student: test.student.mca25@mespune.in / 123456</p>
+          <p style={styles.infoItem}>💻 IT Dept: it@mespune.in / 123456</p>
+          <p style={styles.infoItem}>📚 Academics: academics@mespune.in / 123456</p>
+          <p style={styles.infoItem}>🏠 Hostel: hostel@mespune.in / 123456</p>
+          <p style={styles.infoItem}>📖 Library: library@mespune.in / 123456</p>
+          <p style={styles.infoItem}>🏛️ Administration: administration@mespune.in / 123456</p>
+          <p style={styles.infoItem}>⚽ Sports: sports@mespune.in / 123456</p>
+          <p style={styles.infoItem}>🚌 Transport: transport@mespune.in / 123456</p>
+          <p style={styles.infoItem}>👑 Admin: admin@mespune.in / 123456</p>
+
+          <p style={{ ...styles.infoTitle, marginTop: 8 }}>ℹ️ Registration Info:</p>
+          <p style={styles.infoItem}>
+            <strong>Students:</strong> Use your college email (name.mca25@mespune.in)
+          </p>
+          <p style={styles.infoItem}>
+            <strong>Department Staff:</strong> Use your official department email
+          </p>
         </div>
       </div>
     </div>
@@ -99,76 +159,106 @@ function Login({ setUser }) {
 
 const styles = {
   container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+    padding: '20px',
   },
   card: {
-    background: 'white',
-    padding: '40px',
-    borderRadius: '10px',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-    width: '400px',
+    width: '100%',
+    maxWidth: '420px',
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '32px 28px 24px',
+    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)',
   },
   title: {
+    fontSize: '28px',
+    fontWeight: '700',
     textAlign: 'center',
-    color: '#667eea',
-    marginBottom: '10px',
+    margin: 0,
+    color: '#4f46e5',
   },
   subtitle: {
+    fontSize: '14px',
     textAlign: 'center',
-    color: '#666',
-    marginBottom: '30px',
+    marginTop: '6px',
+    marginBottom: '20px',
+    color: '#6b7280',
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '15px',
+    gap: '14px',
+  },
+  field: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  label: {
+    fontSize: '13px',
+    fontWeight: '500',
+    color: '#4b5563',
   },
   input: {
-    padding: '12px',
-    border: '2px solid #ddd',
-    borderRadius: '5px',
-    fontSize: '16px',
-  },
-  button: {
-    padding: '12px',
-    background: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    fontSize: '16px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
+    padding: '10px 12px',
+    borderRadius: '8px',
+    border: '1px solid #d1d5db',
+    fontSize: '14px',
+    outline: 'none',
+    backgroundColor: '#f9fafb',
   },
   error: {
-    color: 'red',
-    fontSize: '14px',
-    textAlign: 'center',
+    backgroundColor: '#fee2e2',
+    color: '#b91c1c',
+    padding: '8px 10px',
+    borderRadius: '8px',
+    fontSize: '13px',
   },
-  toggle: {
+  primaryButton: {
+    marginTop: '6px',
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: '9999px',
+    border: 'none',
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#ffffff',
+    backgroundColor: '#4f46e5',
+    cursor: 'pointer',
+  },
+  switchText: {
+    marginTop: '14px',
+    fontSize: '13px',
     textAlign: 'center',
-    marginTop: '20px',
-    color: '#666',
+    color: '#6b7280',
   },
   link: {
-    color: '#667eea',
+    color: '#4f46e5',
+    fontWeight: '600',
     cursor: 'pointer',
-    fontWeight: 'bold',
   },
-  testAccounts: {
-    marginTop: '20px',
-    padding: '15px',
-    background: '#f5f5f5',
-    borderRadius: '5px',
+  infoBox: {
+    marginTop: '18px',
+    padding: '10px 12px',
+    borderRadius: '12px',
+    backgroundColor: '#f9fafb',
+    border: '1px dashed #e5e7eb',
+  },
+  infoTitle: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '4px',
+  },
+  infoItem: {
     fontSize: '12px',
+    color: '#6b7280',
+    marginBottom: '2px',
   },
-  testTitle: {
-    fontWeight: 'bold',
-    marginBottom: '5px',
-  }
 };
 
 export default Login;
