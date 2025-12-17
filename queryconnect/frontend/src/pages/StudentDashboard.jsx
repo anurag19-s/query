@@ -8,8 +8,11 @@ function StudentDashboard({ user, onLogout }) {
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState('Academics');
   const [aiSuggestion, setAiSuggestion] = useState('');
+  const [aiSource, setAiSource] = useState('');
+  const [matchedTickets, setMatchedTickets] = useState(0);
   const [loading, setLoading] = useState(false);
   const [expandedComments, setExpandedComments] = useState({});
+
 
   // NEW: Notification state
   const [notifications, setNotifications] = useState([]);
@@ -62,6 +65,7 @@ function StudentDashboard({ user, onLogout }) {
     }
   };
 
+
   const getAISuggestion = async () => {
     if (!description) return;
 
@@ -73,9 +77,11 @@ function StudentDashboard({ user, onLogout }) {
         { description },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       setAiSuggestion(response.data.suggestion);
       setDepartment(response.data.department);
+      setAiSource(response.data.source || '');
+      setMatchedTickets(response.data.matchedTickets || 0);
+
     } catch (error) {
       console.error('AI Error:', error);
       setAiSuggestion('Could not get AI suggestion. Please continue manually.');
@@ -90,9 +96,17 @@ function StudentDashboard({ user, onLogout }) {
       const token = localStorage.getItem('token');
       await axios.post(
         'http://localhost:5000/api/tickets',
-        { title, description, department, aiSuggestion },
+        {
+          title,
+          description,
+          department,
+          aiSuggestion,
+          aiSource,
+          matchedTickets,
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
 
       alert('Ticket created successfully!');
       setShowForm(false);
@@ -249,11 +263,40 @@ function StudentDashboard({ user, onLogout }) {
             </button>
 
             {aiSuggestion && (
-              <div style={styles.aiBox}>
-                <strong>💡 AI Suggestion:</strong>
-                <p style={{ margin: '5px 0 0 0' }}>{aiSuggestion}</p>
+              <div style={{
+                marginTop: '10px',
+                padding: '10px',
+                background: '#f0f7ff',
+                borderLeft:
+                  aiSource === 'ai_with_memory'
+                    ? '4px solid #4CAF50'
+                    : aiSource === 'ai_only'
+                      ? '4px solid #2196F3'
+                      : '4px solid #999',
+                fontSize: '0.9rem',
+                whiteSpace: 'pre-wrap',
+              }}>
+                {aiSource === 'ai_with_memory' && (
+                  <>
+                    <strong>🎯 Smart AI suggestion (uses {matchedTickets} similar resolved ticket{matchedTickets > 1 ? 's' : ''})</strong>
+                    <p style={{ marginTop: '6px' }}>{aiSuggestion}</p>
+                  </>
+                )}
+                {aiSource === 'ai_only' && (
+                  <>
+                    <strong>🤖 AI suggestion (no similar past tickets)</strong>
+                    <p style={{ marginTop: '6px' }}>{aiSuggestion}</p>
+                  </>
+                )}
+                {aiSource === 'fallback' && (
+                  <>
+                    <strong>ℹ️ No AI suggestion available</strong>
+                    <p style={{ marginTop: '6px' }}>{aiSuggestion}</p>
+                  </>
+                )}
               </div>
             )}
+
 
             <label style={styles.label}>Department</label>
             <select

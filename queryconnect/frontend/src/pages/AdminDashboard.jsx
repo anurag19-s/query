@@ -89,6 +89,27 @@ function AdminDashboard({ user, onLogout }) {
       alert(error.response?.data?.message || 'Failed to change status');
     }
   };
+  const handlePriorityChange = async (ticketId, newPriority) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `http://localhost:5000/api/tickets/${ticketId}`,
+        { priority: newPriority },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setTickets(prevTickets =>
+        prevTickets.map(ticket =>
+          ticket._id === ticketId ? { ...ticket, priority: newPriority } : ticket
+        )
+      );
+
+      alert(`Ticket priority changed to ${newPriority}`);
+    } catch (error) {
+      console.error('Priority change error:', error);
+      alert(error.response?.data?.message || 'Failed to change priority');
+    }
+  };
 
   const openReassignModal = (ticketId, currentDept) => {
     setReassignModal({ show: true, ticketId, currentDept });
@@ -285,6 +306,41 @@ function AdminDashboard({ user, onLogout }) {
           <p>Resolved</p>
         </div>
       </div>
+      <div style={styles.deptBreakdown}>
+        <h2>Department Breakdown</h2>
+        <div style={styles.deptGrid}>
+          {['Academics', 'Hostel', 'Library', 'IT', 'Administration', 'Sports', 'Transport'].map(dept => {
+            const deptTickets = tickets.filter(t => t.department === dept);
+            const pending = deptTickets.filter(t => t.status === 'Pending').length;
+            const inProgress = deptTickets.filter(t => t.status === 'In Progress').length;
+            const resolved = deptTickets.filter(t => t.status === 'Resolved').length;
+
+            return (
+              <div key={dept} style={styles.deptCard}>
+                <h3>{dept}</h3>
+                <div style={styles.deptStats}>
+                  <div>
+                    <strong>{deptTickets.length}</strong>
+                    <p>Total</p>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#ffa500' }}>{pending}</strong>
+                    <p>Pending</p>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#2196F3' }}>{inProgress}</strong>
+                    <p>In Progress</p>
+                  </div>
+                  <div>
+                    <strong style={{ color: '#4CAF50' }}>{resolved}</strong>
+                    <p>Resolved</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
       {/* Notification Sender */}
       <div style={styles.notificationSection}>
         <h2>📢 Send Notification</h2>
@@ -317,23 +373,25 @@ function AdminDashboard({ user, onLogout }) {
               </select>
             </div>
 
+
             {/* Show Ticket ID field for student audience */}
             {noticeAudience === 'student' && (
-              <div>
-                <label style={styles.label}>Ticket ID (Required):</label>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={styles.label}>Ticket ID (Required)</label>
                 <input
                   type="text"
                   placeholder="Enter ticket ID to notify student"
                   value={noticeTicketId}
-                  onChange={(e) => setNoticeTicketId(e.target.value)}
+                  onChange={e => setNoticeTicketId(e.target.value)}
                   style={styles.input}
                   required
                 />
-                <small style={{ color: '#666', fontSize: '12px' }}>
-                  The student who created this ticket will receive the notification
-                </small>
+                <span style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+                  The student who created this ticket will receive the notification.
+                </span>
               </div>
             )}
+
 
             {/* Show Department field for department audience */}
             {noticeAudience === 'department' && (
@@ -411,7 +469,7 @@ function AdminDashboard({ user, onLogout }) {
                   <div style={styles.ticketHeaderLeft}>
                     <h3 style={styles.ticketTitle}>{ticket.title}</h3>
                     <div style={styles.ticketMeta}>
-                      <span>👤 {ticket.student?.name || 'Unknown Student'}</span>
+                      <span>👤 {ticket.studentName || 'Guest User'}</span>
                       <span>🏢 {ticket.department}</span>
                       <span>📅 {new Date(ticket.createdAt).toLocaleDateString()}</span>
                       <button
@@ -447,6 +505,19 @@ function AdminDashboard({ user, onLogout }) {
                         <option value="In Progress">In Progress</option>
                         <option value="Resolved">Resolved</option>
                         <option value="Closed">Closed</option>
+                      </select>
+                    </div>
+                    <div style={styles.statusControl}>
+                      <label style={styles.statusLabel}>Priority:</label>
+                      <select
+                        value={ticket.priority || 'None'}
+                        onChange={(e) => handlePriorityChange(ticket._id, e.target.value === 'None' ? null : e.target.value)}
+                        style={styles.statusSelect}
+                      >
+                        <option value="None">None</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
                       </select>
                     </div>
                   </div>
@@ -551,41 +622,7 @@ function AdminDashboard({ user, onLogout }) {
         )}
       </div>
 
-      <div style={styles.deptBreakdown}>
-        <h2>Department Breakdown</h2>
-        <div style={styles.deptGrid}>
-          {['Academics', 'Hostel', 'Library', 'IT', 'Administration', 'Sports', 'Transport'].map(dept => {
-            const deptTickets = tickets.filter(t => t.department === dept);
-            const pending = deptTickets.filter(t => t.status === 'Pending').length;
-            const inProgress = deptTickets.filter(t => t.status === 'In Progress').length;
-            const resolved = deptTickets.filter(t => t.status === 'Resolved').length;
 
-            return (
-              <div key={dept} style={styles.deptCard}>
-                <h3>{dept}</h3>
-                <div style={styles.deptStats}>
-                  <div>
-                    <strong>{deptTickets.length}</strong>
-                    <p>Total</p>
-                  </div>
-                  <div>
-                    <strong style={{ color: '#ffa500' }}>{pending}</strong>
-                    <p>Pending</p>
-                  </div>
-                  <div>
-                    <strong style={{ color: '#2196F3' }}>{inProgress}</strong>
-                    <p>In Progress</p>
-                  </div>
-                  <div>
-                    <strong style={{ color: '#4CAF50' }}>{resolved}</strong>
-                    <p>Resolved</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -963,10 +1000,10 @@ const styles = {
   },
   notificationSection: {
     background: 'white',
-    padding: '20px',
+    padding: '25px',
     borderRadius: '10px',
     boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-    marginBottom: '20px'
+    marginBottom: '30px'
   },
   notificationForm: {
     display: 'flex',
@@ -999,6 +1036,22 @@ const styles = {
     cursor: 'pointer',
     fontWeight: '500',
     transition: 'all 0.2s'
+  },
+  input: {
+    padding: '12px',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
+    fontSize: '15px',
+    outline: 'none'
+  },
+  textarea: {
+    padding: '12px',
+    border: '2px solid #e0e0e0',
+    borderRadius: '8px',
+    fontSize: '15px',
+    resize: 'vertical',
+    fontFamily: 'inherit',
+    outline: 'none'
   },
 };
 

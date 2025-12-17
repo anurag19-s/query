@@ -39,6 +39,14 @@ const ticketSchema = new mongoose.Schema({
   aiSuggestion: {
     type: String
   },
+  aiSource: {
+    type: String, // 'previous_ticket', 'ai', 'fallback'
+    default: null
+  },
+  matchedTickets: {
+    type: Number,
+    default: 0
+  },
   comments: [{
     text: String,
     by: String,

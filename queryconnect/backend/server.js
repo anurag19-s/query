@@ -5,11 +5,16 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
+
+
 const User = require('./models/User');
 const Ticket = require('./models/Ticket');
 const Notification = require('./models/Notification');
+const { getLLMSuggestion } = require('./services/llmService'); // ADD
 
 const app = express();
+
+
 
 // Middleware
 app.use(cors());
@@ -101,6 +106,9 @@ function determineUserRole(email) {
 
   throw new Error('Invalid email domain. Students must use @mespune.in email format (e.g., yourname.mca25@mespune.in). Department staff must use official department emails.');
 }
+// Add this RIGHT AFTER the determineUserRole function and BEFORE MongoDB Connection
+
+// ==================== HELPER FUNCTION FOR KEYWORD EXTRACTION ====================
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/queryconnect';
@@ -110,7 +118,13 @@ mongoose.connect(MONGODB_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB');
     seedDefaultUsers();
+    // ADD THESE LINES HERE:
+    // Create text index for AI search (title + description)
+    Ticket.collection.createIndex({ title: 'text', description: 'text' })
+      .then(() => console.log('✅ Text index on Ticket(title, description) ready'))
+      .catch(err => console.error('❌ Text index error:', err));
   })
+
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // ==================== SEED DEFAULT USERS ====================
@@ -448,7 +462,7 @@ app.delete('/api/notifications/:id', authenticateToken, async (req, res) => {
 // Create Ticket
 app.post('/api/tickets', authenticateToken, async (req, res) => {
   try {
-    const { title, description, department, aiSuggestion, priority } = req.body;
+    const { title, description, department, aiSuggestion, aiSource, matchedTickets, priority } = req.body;
 
     const student = await User.findById(req.user.id);
     if (!student) {
@@ -463,6 +477,8 @@ app.post('/api/tickets', authenticateToken, async (req, res) => {
       studentName: student.name,
       studentEmail: student.email,
       aiSuggestion,
+      aiSource: aiSource || null,
+      matchedTickets: matchedTickets || 0,
       priority: priority || 'Medium',
       status: 'Pending'
     });
@@ -553,9 +569,9 @@ app.patch('/api/tickets/:id', authenticateToken, async (req, res) => {
     }
 
     await ticket.save();
-    
+
     console.log(`✅ Ticket updated by ${req.user.role}: Status=${status || 'unchanged'}, Priority=${priority || 'unchanged'}`);
-    
+
     res.json(ticket);
   } catch (error) {
     console.error('Update ticket error:', error);
@@ -618,6 +634,157 @@ app.delete('/api/tickets/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
   }
 });
+function extractKeywords(text) {
+  if (!text) return [];
+
+  // Common stopwords to filter out
+  const stopwords = new Set([
+    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
+    'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
+    'to', 'was', 'will', 'with', 'have', 'has', 'had', 'i', 'my',
+    'me', 'we', 'our', 'there', 'not', 'can', 'cannot', 'am', 'issue',
+    'problem', 'help', 'please', 'need'
+  ]);
+
+  // Extract words, convert to lowercase, filter stopwords and short words
+  const words = text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Remove punctuation
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopwords.has(word));
+
+  // Return unique keywords
+  return [...new Set(words)];
+}
+// ==================== AI SUGGESTION ROUTE (LLM + MEMORY) ====================
+app.post('/api/ai-suggest', authenticateToken, async (req, res) => {
+  console.log('🔵 AI SUGGEST ROUTE HIT!');
+  const { description } = req.body;
+
+  try {
+    // 1) Extract keywords from description
+    const keywords = extractKeywords(description);
+    console.log('AI request description:', description);
+    console.log('Keywords:', keywords);
+
+    // 2) Find similar resolved tickets - RELAXED QUERY
+    let similarTickets = [];
+    if (keywords.length > 0) {
+      const regex = new RegExp(keywords.join('|'), 'i');
+
+      // First try: Resolved tickets with comments
+      similarTickets = await Ticket.find({
+        status: 'Resolved',
+        $or: [
+          { title: regex },
+          { description: regex },
+          { 'comments.text': regex },
+        ],
+        'comments.0': { $exists: true }
+      })
+        .limit(5)
+        .sort({ resolvedAt: -1 });
+
+      // If no results, try ANY resolved ticket (even without comments)
+      if (similarTickets.length === 0) {
+        console.log('🔍 No tickets with comments found, trying without comment requirement...');
+        similarTickets = await Ticket.find({
+          status: 'Resolved',
+          $or: [
+            { title: regex },
+            { description: regex },
+          ]
+        })
+          .limit(5)
+          .sort({ resolvedAt: -1 });
+      }
+
+      // If STILL no results, try ALL tickets (even Pending/In Progress)
+      if (similarTickets.length === 0) {
+        console.log('🔍 No resolved tickets found, trying ANY status...');
+        similarTickets = await Ticket.find({
+          $or: [
+            { title: regex },
+            { description: regex },
+          ]
+        })
+          .limit(5)
+          .sort({ createdAt: -1 });
+      }
+    }
+
+    console.log(
+      'Similar tickets found:',
+      similarTickets.map(t => `${t.title} (${t.status})`)
+    );
+
+    // 3) Call LLM with current issue + similar tickets
+    let payload;
+    try {
+      const llmResult = await getLLMSuggestion(description, similarTickets);
+
+      // Build suggestion with context about previous tickets
+      let finalSuggestion = '';
+
+      if (similarTickets.length > 0) {
+        finalSuggestion = `📚 Good news! The ${llmResult.department} department has resolved similar issues before.\n\n` +
+          `🤖 AI Suggestion:\n${llmResult.suggestion}`;
+      } else {
+        finalSuggestion = `💡 This appears to be a new type of issue for the ${llmResult.department} department.\n\n` +
+          `🤖 One possible solution the department might take:\n${llmResult.suggestion}`;
+      }
+
+      payload = {
+        suggestion: finalSuggestion,
+        department: llmResult.department,
+        source: similarTickets.length ? 'ai_with_memory' : 'ai_only',
+        matchedTickets: similarTickets.length
+      };
+    } catch (llmError) {
+      console.error('LLM Error:', llmError.message);
+
+      // If LLM fails but we have a good past ticket, still use it
+      if (similarTickets.length > 0) {
+        const bestMatch = similarTickets[0];
+        const lastComment = bestMatch.comments[bestMatch.comments.length - 1];
+
+        // ✅ FIXED: Use consistent format even when LLM fails
+        let fallbackSuggestion = `📚 Good news! The ${bestMatch.department} department has resolved similar issues before.\n\n` +
+          `🤖 Based on previous resolutions:\n${lastComment?.text || 'The department successfully resolved this issue.'}`;
+
+        payload = {
+          suggestion: fallbackSuggestion,
+          department: bestMatch.department,
+          source: 'previous_ticket',
+          matchedTickets: similarTickets.length
+        };
+      } else {
+        // ✅ FIXED: Better fallback message for completely new issues
+        payload = {
+          suggestion:
+            `💡 This appears to be a new issue.\n\n` +
+            `One possible solution the department might take is to review your request and provide a customized solution based on your specific situation.\n\n` +
+            `Your query has been recorded and a staff member will review it shortly.`,
+          department: 'Administration',
+          source: 'fallback',
+          matchedTickets: 0
+        };
+      }
+    }
+
+    return res.json(payload);
+  } catch (error) {
+    console.error('AI Error (outer):', error);
+    return res.json({
+      suggestion:
+        'Your query has been recorded. A staff member will review it shortly.',
+      department: 'Administration',
+      source: 'fallback',
+      matchedTickets: 0
+    });
+  }
+});
+
 
 // ==================== GUEST TICKET ROUTES ====================
 
@@ -630,9 +797,11 @@ function generateTrackingId() {
   return id;
 }
 
+// Replace your guest ticket creation route with this corrected version:
+
 app.post('/api/guest-tickets', async (req, res) => {
   try {
-    const { title, description, department } = req.body;
+    const { title, description, department, guestEmail, aiSuggestion, aiSource, matchedTickets } = req.body;
 
     const trackingId = generateTrackingId();
 
@@ -640,14 +809,17 @@ app.post('/api/guest-tickets', async (req, res) => {
       title,
       description,
       department,
-      student: null,
+      student: null,  // Guest has no user account
       studentName: 'Guest User',
-      studentEmail: 'guest@anonymous',
-      isGuest: true,
-      guestEmail: null,
-      trackingId: trackingId,
-      status: 'Pending',
+      studentEmail: guestEmail || 'guest@example.com',
+      aiSuggestion: aiSuggestion || null,
+      aiSource: aiSource || null,
+      matchedTickets: matchedTickets || 0,
       priority: 'Medium',
+      status: 'Pending',
+      isGuest: true,
+      guestEmail: guestEmail,
+      trackingId: trackingId
     });
 
     await ticket.save();
@@ -745,52 +917,36 @@ app.get('/api/analytics', authenticateToken, async (req, res) => {
   }
 });
 
-// ==================== AI ROUTE ====================
+// ==================== DEPARTMENT LIST ROUTE ====================
 
-app.post('/api/ai-suggest', authenticateToken, async (req, res) => {
-  try {
-    const { description } = req.body;
-
-    let department = 'Administration';
-    let suggestion = 'Your query has been received. Our team will review it shortly.';
-
-    const lowerDesc = description.toLowerCase();
-
-    if (lowerDesc.includes('wifi') || lowerDesc.includes('internet') || lowerDesc.includes('computer') || lowerDesc.includes('laptop') || lowerDesc.includes('network')) {
-      department = 'IT';
-      suggestion = 'For IT-related issues, please try restarting your device first. If the problem persists, our IT team will assist you.';
-    } else if (lowerDesc.includes('hostel') || lowerDesc.includes('room') || lowerDesc.includes('mess') || lowerDesc.includes('food') || lowerDesc.includes('warden')) {
-      department = 'Hostel';
-      suggestion = 'For hostel-related concerns, please ensure you have reported this to your hostel warden as well.';
-    } else if (lowerDesc.includes('book') || lowerDesc.includes('library') || lowerDesc.includes('journal') || lowerDesc.includes('reading')) {
-      department = 'Library';
-      suggestion = 'For library queries, you can also check our online catalog or contact the librarian directly.';
-    } else if (lowerDesc.includes('exam') || lowerDesc.includes('grade') || lowerDesc.includes('course') || lowerDesc.includes('class') || lowerDesc.includes('marks') || lowerDesc.includes('academic')) {
-      department = 'Academics';
-      suggestion = 'For academic matters, please also consult your course coordinator or faculty advisor.';
-    } else if (lowerDesc.includes('bus') || lowerDesc.includes('transport') || lowerDesc.includes('vehicle')) {
-      department = 'Transport';
-      suggestion = 'For transport issues, please check the latest bus schedule on the notice board.';
-    } else if (lowerDesc.includes('sport') || lowerDesc.includes('gym') || lowerDesc.includes('ground') || lowerDesc.includes('play')) {
-      department = 'Sports';
-      suggestion = 'For sports facilities, please contact the sports coordinator for bookings and schedules.';
-    } else if (lowerDesc.includes('fee') || lowerDesc.includes('admission') || lowerDesc.includes('certificate') || lowerDesc.includes('document')) {
-      department = 'Administration';
-      suggestion = 'For administrative queries, please visit the administration office during working hours.';
-    }
-
-    res.json({ suggestion, department });
-  } catch (error) {
-    console.error('AI suggest error:', error);
-    res.status(500).json({ message: 'AI suggestion failed', error: error.message });
-  }
-});
 
 app.get('/api/departments', (req, res) => {
   const departments = [...new Set(Object.values(DEPARTMENT_EMAILS))];
   res.json({ departments });
 });
+// ADD THIS TEMPORARY DEBUG ROUTE (after other routes, before the server.listen)
+app.get('/api/debug-tickets', authenticateToken, async (req, res) => {
+  try {
+    const allTickets = await Ticket.find({});
+    const wifiTickets = allTickets.filter(t =>
+      t.title?.toLowerCase().includes('wifi') ||
+      t.description?.toLowerCase().includes('wifi')
+    );
 
+    res.json({
+      totalTickets: allTickets.length,
+      wifiTickets: wifiTickets.map(t => ({
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        hasComments: t.comments?.length > 0,
+        commentCount: t.comments?.length || 0
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
