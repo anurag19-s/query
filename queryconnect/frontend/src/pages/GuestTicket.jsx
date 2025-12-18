@@ -1,429 +1,335 @@
-import { useState } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 
 function GuestTicket() {
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [department, setDepartment] = useState('Academics');
-    const [message, setMessage] = useState('');
-    const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-    // tracking id coming from backend (GUEST-XXXXXX)
-    const [trackingId, setTrackingId] = useState('');
-    const [submitted, setSubmitted] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [department, setDepartment] = useState("Academics");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-    const navigate = useNavigate();
+  const [trackingId, setTrackingId] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setMessage('');
-        setLoading(true);
+  const [theme, setTheme] = useState(
+    localStorage.getItem("guest-theme") || "light"
+  );
 
-        try {
-            const res = await axios.post('http://localhost:5000/api/guest-tickets', {
-                title,
-                description,
-                department
-            });
+  /* ===========================
+     GLOBAL THEME APPLY
+  ============================ */
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    document.body.style.margin = "0";
+    document.body.style.background =
+      theme === "dark"
+        ? "radial-gradient(circle at top, #1e2230, #0b0d14)"
+        : "linear-gradient(135deg,#eef2ff,#ffffff)";
+    localStorage.setItem("guest-theme", theme);
+  }, [theme]);
 
-            console.log('Guest ticket response:', res.data);
-            console.log('Tracking ID from backend:', res.data.trackingId);
+  /* ===========================
+     SUBMIT HANDLER
+  ============================ */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage("");
+    setLoading(true);
 
-            const tid = res.data && res.data.trackingId ? res.data.trackingId : '';
-            setTrackingId(tid);
-            setSubmitted(true);
+    try {
+      const res = await axios.post("http://localhost:5000/api/guest-tickets", {
+        title,
+        description,
+        department,
+      });
 
-            setTitle('');
-            setDescription('');
-        } catch (err) {
-            console.error(err);
-            setMessage('Failed to submit query. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCopy = () => {
-        if (!trackingId) return;
-        navigator.clipboard.writeText(trackingId);
-        alert('Tracking ID copied to clipboard!');
-    };
-
-    const handleTrack = () => {
-        if (!trackingId) return;
-        navigate('/track', { state: { trackingId } });
-    };
-
-    const handleSubmitAnother = () => {
-        setSubmitted(false);
-        setTrackingId('');
-        setMessage('');
-    };
-
-    // ============== SUCCESS SCREEN ==============
-    if (submitted) {
-        return (
-            <div style={styles.container}>
-                <div style={styles.card}>
-                    <div style={styles.iconCircle}>✓</div>
-                    <h1 style={styles.title}>Query Submitted Successfully!</h1>
-                    <p style={styles.subtitle}>
-                        Your query has been received anonymously. Use the tracking ID below to check its status.
-                    </p>
-
-                    <div style={styles.trackingBox}>
-                        <p style={styles.trackingLabel}>Your Tracking ID</p>
-                        <div style={styles.trackingRow}>
-                            <input
-                                style={styles.trackingInput}
-                                value={trackingId}
-                                readOnly
-                            />
-                            <button
-                                type="button"
-                                style={styles.copyButton}
-                                onClick={handleCopy}
-                            >
-                                📋 Copy
-                            </button>
-                        </div>
-                        <p style={styles.trackingHint}>
-                            💡 Save this ID. You will need it to track your query later.
-                        </p>
-                    </div>
-
-                    <button style={styles.primaryButton} onClick={handleTrack}>
-                        Track This Query
-                    </button>
-                    <button style={styles.secondaryButton} onClick={handleSubmitAnother}>
-                        Submit Another Query
-                    </button>
-                    <button style={styles.tertiaryButton} onClick={() => navigate('/')}>
-                        Back to Login
-                    </button>
-                </div>
-            </div>
-        );
+      setTrackingId(res.data.trackingId);
+      setSubmitted(true);
+      setTitle("");
+      setDescription("");
+    } catch {
+      setMessage("Failed to submit query. Please try again.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // ============== FORM SCREEN ==============
-    return (
-        <div style={styles.container}>
-            <div style={styles.card}>
-                <h1 style={styles.title}>QueryConnect</h1>
-                <p style={styles.subtitle}>Submit an anonymous query</p>
-                
-                <div style={styles.infoBox}>
-                    <p style={styles.infoText}>
-                        🔒 <strong>Fully Anonymous:</strong> No personal information required. 
-                        You'll receive a tracking ID to check your query status.
-                    </p>
-                </div>
+  const handleCopy = () => {
+    navigator.clipboard.writeText(trackingId);
+  };
 
-                <form onSubmit={handleSubmit} style={styles.form}>
-                    <div style={styles.field}>
-                        <label style={styles.label}>Title</label>
-                        <input
-                            style={styles.input}
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Short title for your issue"
-                            required
-                        />
-                    </div>
+  const styles = getStyles(theme);
 
-                    <div style={styles.field}>
-                        <label style={styles.label}>Description</label>
-                        <textarea
-                            style={{ ...styles.input, height: '100px', resize: 'vertical' }}
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Describe your query or complaint in detail"
-                            required
-                        />
-                    </div>
+  return (
+    <div style={styles.page}>
+      {/* Theme Toggle */}
+      <button
+        style={styles.themeToggle}
+        onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+        aria-label="Toggle theme"
+      >
+        {theme === "light" ? "Dark" : "Light"}
+      </button>
 
-                    <div style={styles.field}>
-                        <label style={styles.label}>Department</label>
-                        <select
-                            style={styles.input}
-                            value={department}
-                            onChange={(e) => setDepartment(e.target.value)}
-                        >
-                            <option value="Academics">Academics</option>
-                            <option value="Hostel">Hostel</option>
-                            <option value="Library">Library</option>
-                            <option value="IT">IT</option>
-                            <option value="Administration">Administration</option>
-                            <option value="Sports">Sports</option>
-                            <option value="Transport">Transport</option>
-                        </select>
-                    </div>
+      <AnimatePresence mode="wait">
+        {submitted ? (
+          <motion.div
+            key="success"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            style={styles.card}
+          >
+            <div style={styles.successIcon}>✓</div>
 
-                    {message && <div style={styles.message}>{message}</div>}
+            <h1 style={styles.title}>Query Submitted</h1>
+            <p style={styles.subtitle}>
+              Save this tracking ID to track your request.
+            </p>
 
-                    <button type="submit" style={styles.primaryButton} disabled={loading}>
-                        {loading ? 'Submitting...' : 'Submit Anonymous Query'}
-                    </button>
-                </form>
-
-                {/* Track existing guest ticket */}
-                <div style={styles.trackSection}>
-                    <p style={styles.trackTitle}>
-                        Already have a tracking ID?
-                    </p>
-                    <div style={styles.trackRow}>
-                        <input
-                            style={{ ...styles.input, flex: 1 }}
-                            placeholder="Enter your tracking ID (e.g., GUEST-ABC123)"
-                            value={trackingId}
-                            onChange={(e) => setTrackingId(e.target.value.toUpperCase())}
-                        />
-                        <button
-                            type="button"
-                            style={styles.trackButton}
-                            onClick={() => {
-                                if (!trackingId.trim()) {
-                                    alert('Please enter a tracking ID');
-                                    return;
-                                }
-                                navigate('/track', { state: { trackingId: trackingId.trim().toUpperCase() } });
-                            }}
-                        >
-                            Track
-                        </button>
-                    </div>
-                </div>
-
-                {/* Back to Login link */}
-                <div style={styles.loginLink}>
-                    <button 
-                        onClick={() => navigate('/')} 
-                        style={styles.linkButton}
-                    >
-                        ← Back to Login
-                    </button>
-                </div>
+            <div style={styles.trackingBox}>
+              <input style={styles.trackingInput} value={trackingId} readOnly />
+              <button style={styles.copyBtn} onClick={handleCopy}>
+                Copy
+              </button>
             </div>
-        </div>
-    );
+
+            <button
+              style={styles.primaryBtn}
+              onClick={() => navigate("/track", { state: { trackingId } })}
+            >
+              Track Query
+            </button>
+
+            <button
+              style={styles.secondaryBtn}
+              onClick={() => setSubmitted(false)}
+            >
+              Submit Another
+            </button>
+
+            <button style={styles.linkBtn} onClick={() => navigate("/")}>
+              Back to Login
+            </button>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            style={styles.card}
+          >
+            <h1 style={styles.title}>QueryConnect</h1>
+            <p style={styles.subtitle}>Anonymous Guest Query</p>
+
+            <form onSubmit={handleSubmit} style={styles.form}>
+              <input
+                style={styles.input}
+                placeholder="Title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+
+              <textarea
+                style={{ ...styles.input, height: 90 }}
+                placeholder="Describe your issue"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+              />
+
+              <select
+                style={styles.input}
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+              >
+                {[
+                  "Academics",
+                  "Hostel",
+                  "Library",
+                  "IT",
+                  "Administration",
+                  "Sports",
+                  "Transport",
+                ].map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
+              </select>
+
+              {message && <div style={styles.error}>{message}</div>}
+
+              <button style={styles.primaryBtn} disabled={loading}>
+                {loading ? "Submitting…" : "Submit Query"}
+              </button>
+            </form>
+
+            <div style={styles.trackRow}>
+              <input
+                style={styles.input}
+                placeholder="Tracking ID"
+                value={trackingId}
+                onChange={(e) => setTrackingId(e.target.value)}
+              />
+              <button
+                style={styles.trackBtn}
+                onClick={() => navigate("/track", { state: { trackingId } })}
+              >
+                Track
+              </button>
+            </div>
+
+            <button style={styles.linkBtn} onClick={() => navigate("/")}>
+              Back to Login
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
-const styles = {
-    container: {
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-        padding: '20px',
+/* ===========================
+   STYLES
+=========================== */
+function getStyles(theme) {
+  const dark = theme === "dark";
+
+  return {
+    page: {
+      position: "fixed",
+      inset: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+      fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
+    },
+    themeToggle: {
+      position: "absolute",
+      top: 20,
+      right: 20,
+      borderRadius: 999,
+      padding: "8px 14px",
+      border: "1px solid #e5e7eb",
+      background: dark ? "#0b0d14" : "#ffffff",
+      color: dark ? "#fff" : "#111",
+      cursor: "pointer",
+      fontSize: 13,
     },
     card: {
-        width: '100%',
-        maxWidth: '520px',
-        backgroundColor: '#ffffff',
-        borderRadius: '16px',
-        padding: '28px 24px 24px',
-        boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)',
-        textAlign: 'center',
-    },
-    iconCircle: {
-        width: '64px',
-        height: '64px',
-        borderRadius: '9999px',
-        backgroundColor: '#22c55e',
-        color: '#ffffff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '32px',
-        margin: '0 auto 12px',
+      width: "100%",
+      maxWidth: 420,
+      background: dark ? "#0b0d14" : "#ffffff",
+      borderRadius: 20,
+      padding: 28,
+      boxShadow: "0 40px 80px rgba(0,0,0,0.35)",
+      textAlign: "center",
     },
     title: {
-        fontSize: '24px',
-        fontWeight: '700',
-        margin: 0,
-        color: '#111827',
+      fontSize: 24,
+      fontWeight: 700,
+      color: dark ? "#ffffff" : "#111827",
     },
     subtitle: {
-        fontSize: '14px',
-        marginTop: '6px',
-        marginBottom: '12px',
-        color: '#6b7280',
+      fontSize: 14,
+      color: dark ? "#9ca3af" : "#6b7280",
+      marginBottom: 16,
     },
-    infoBox: {
-        marginBottom: '18px',
-        padding: '12px 14px',
-        backgroundColor: '#eff6ff',
-        borderRadius: '8px',
-        border: '1px solid #bfdbfe',
-    },
-    infoText: {
-        fontSize: '13px',
-        color: '#1e40af',
-        margin: 0,
-        textAlign: 'left',
-        lineHeight: '1.5',
-    },
-    form: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        textAlign: 'left',
-    },
-    field: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '6px',
-    },
-    label: {
-        fontSize: '13px',
-        fontWeight: '500',
-        color: '#4b5563',
-    },
+    form: { display: "flex", flexDirection: "column", gap: 12 },
     input: {
-        padding: '10px 12px',
-        borderRadius: '8px',
-        border: '1px solid #d1d5db',
-        fontSize: '14px',
-        outline: 'none',
-        backgroundColor: '#f9fafb',
-        color: '#111827',
+      padding: 12,
+      borderRadius: 12,
+      border: dark ? "1px solid #1f2933" : "1px solid #e5e7eb",
+      background: dark ? "#020617" : "#f9fafb",
+      color: dark ? "#ffffff" : "#111",
     },
-    message: {
-        fontSize: '13px',
-        color: '#b91c1c',
-        backgroundColor: '#fee2e2',
-        borderRadius: '8px',
-        padding: '8px 10px',
+    primaryBtn: {
+      marginTop: 8,
+      padding: 12,
+      borderRadius: 999,
+      border: "none",
+      background: "#4f46e5",
+      color: "#ffffff",
+      fontWeight: 600,
+      cursor: "pointer",
     },
-    primaryButton: {
-        marginTop: '10px',
-        width: '100%',
-        padding: '10px 12px',
-        borderRadius: '9999px',
-        border: 'none',
-        fontSize: '15px',
-        fontWeight: '600',
-        color: '#ffffff',
-        backgroundColor: '#4f46e5',
-        cursor: 'pointer',
-        transition: 'background-color 0.2s',
+    secondaryBtn: {
+      marginTop: 8,
+      padding: 12,
+      borderRadius: 999,
+      border: "none",
+      background: dark ? "#1f2933" : "#e5e7eb",
+      color: dark ? "#fff" : "#111",
+      cursor: "pointer",
     },
-    secondaryButton: {
-        marginTop: '10px',
-        width: '100%',
-        padding: '10px 12px',
-        borderRadius: '9999px',
-        border: 'none',
-        fontSize: '15px',
-        fontWeight: '600',
-        color: '#111827',
-        backgroundColor: '#e5e7eb',
-        cursor: 'pointer',
-        transition: 'background-color 0.2s',
-    },
-    tertiaryButton: {
-        marginTop: '10px',
-        width: '100%',
-        padding: '10px 12px',
-        borderRadius: '9999px',
-        border: 'none',
-        fontSize: '15px',
-        fontWeight: '600',
-        color: '#6b7280',
-        backgroundColor: '#f3f4f6',
-        cursor: 'pointer',
-        transition: 'background-color 0.2s',
-    },
-    trackingBox: {
-        marginTop: '18px',
-        padding: '14px 12px',
-        borderRadius: '12px',
-        border: '1px dashed #e5e7eb',
-        backgroundColor: '#f9fafb',
-        textAlign: 'left',
-    },
-    trackingLabel: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#374151',
-        marginBottom: '6px',
-    },
-    trackingRow: {
-        display: 'flex',
-        gap: '8px',
-    },
-    trackingInput: {
-        flex: 1,
-        padding: '10px 12px',
-        borderRadius: '9999px',
-        border: '1px solid #d1d5db',
-        fontSize: '14px',
-        backgroundColor: '#ffffff',
-        color: '#111827',
-    },
-    copyButton: {
-        padding: '10px 14px',
-        borderRadius: '9999px',
-        border: 'none',
-        backgroundColor: '#4f46e5',
-        color: '#ffffff',
-        fontSize: '13px',
-        fontWeight: '600',
-        cursor: 'pointer',
-        whiteSpace: 'nowrap',
-        transition: 'background-color 0.2s',
-    },
-    trackingHint: {
-        fontSize: '12px',
-        color: '#6b7280',
-        marginTop: '6px',
-    },
-    trackSection: {
-        marginTop: '20px',
-        paddingTop: '16px',
-        borderTop: '1px solid #e5e7eb',
-        textAlign: 'left',
-    },
-    trackTitle: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#4b5563',
-        marginBottom: '8px',
+    linkBtn: {
+      marginTop: 12,
+      background: "none",
+      border: "none",
+      color: "#6366f1",
+      cursor: "pointer",
+      fontSize: 14,
     },
     trackRow: {
-        display: 'flex',
-        gap: '8px',
-        alignItems: 'center',
+      display: "flex",
+      gap: 8,
+      marginTop: 16,
     },
-    trackButton: {
-        padding: '10px 20px',
-        borderRadius: '8px',
-        border: 'none',
-        fontSize: '14px',
-        fontWeight: '600',
-        color: '#ffffff',
-        backgroundColor: '#4f46e5',
-        cursor: 'pointer',
-        whiteSpace: 'nowrap',
-        transition: 'background-color 0.2s',
+    trackBtn: {
+      padding: "10px 16px",
+      borderRadius: 12,
+      border: "none",
+      background: "#4f46e5",
+      color: "#fff",
+      cursor: "pointer",
     },
-    loginLink: {
-        marginTop: '16px',
-        textAlign: 'center',
+    successIcon: {
+      width: 60,
+      height: 60,
+      borderRadius: "50%",
+      background: "#22c55e",
+      color: "#ffffff",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 28,
+      margin: "0 auto 12px",
     },
-    linkButton: {
-        background: 'none',
-        border: 'none',
-        color: '#6366f1',
-        fontSize: '14px',
-        fontWeight: '500',
-        cursor: 'pointer',
-        textDecoration: 'none',
-        padding: '4px 8px',
+    trackingBox: {
+      display: "flex",
+      gap: 8,
+      marginTop: 16,
     },
-};
+    trackingInput: {
+      flex: 1,
+      padding: 12,
+      borderRadius: 999,
+      border: "1px solid #e5e7eb",
+    },
+    copyBtn: {
+      padding: "10px 14px",
+      borderRadius: 999,
+      background: "#4f46e5",
+      color: "#ffffff",
+      border: "none",
+      cursor: "pointer",
+    },
+    error: {
+      background: "#fee2e2",
+      color: "#b91c1c",
+      padding: 8,
+      borderRadius: 8,
+      fontSize: 13,
+    },
+  };
+}
 
 export default GuestTicket;
