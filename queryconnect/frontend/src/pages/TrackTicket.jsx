@@ -7,121 +7,174 @@ function TrackTicket() {
   const [ticket, setTicket] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+  const [isDark, setIsDark] = useState(true); // Added Theme State
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
-  }, [theme]);
+  const palette = {
+    darkest: "#010101",
+    deep: "#1C1C1E",
+    accent: "#0071E3",
+    light: "#F5F5F7",
+    white: "#FFFFFF",
+    gray: "#86868B",
+  };
+
+  const theme = {
+    bg: isDark ? palette.darkest : palette.light,
+    card: isDark ? "rgba(28, 28, 30, 0.7)" : "rgba(255, 255, 255, 0.8)",
+    text: isDark ? palette.white : "#1D1D1F",
+    subText: isDark ? palette.gray : "#6E6E73",
+    border: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
+    input: isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.05)",
+    blur: "25px",
+  };
 
   const handleSearch = async (e) => {
     e.preventDefault();
     setError("");
-    setTicket(null);
-
-    if (!ticketId.trim()) {
-      setError("Please enter a valid Ticket ID");
-      return;
-    }
+    if (!ticketId.trim()) return setError("Please enter a ticket ID");
 
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await axios.get(
         `http://localhost:5000/api/track/${ticketId.trim()}`,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+        { headers }
       );
-
       setTicket(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || "Ticket not found");
+      setError(
+        err.response?.data?.message || "Ticket not found or access denied"
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (d) => (d ? new Date(d).toLocaleString() : "—");
-
   return (
-    <div className="page">
-      <div className="card">
-        {/* Header */}
-        <div className="header">
-          <h1>Track Ticket</h1>
-          <button
-            className="themeToggle"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            aria-label="Toggle theme"
-          >
-            {theme === "dark" ? "☀︎" : "☾"}
-          </button>
-        </div>
+    <div style={{ ...styles.container, background: theme.bg }}>
+      <style>{`
+                * { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+                input:focus { border: 1px solid ${palette.accent} !important; background: transparent !important; }
+                .glass { backdrop-filter: blur(${theme.blur}); -webkit-backdrop-filter: blur(${theme.blur}); }
+                .custom-scroll::-webkit-scrollbar { width: 4px; }
+                .custom-scroll::-webkit-scrollbar-thumb { background: ${theme.border}; borderRadius: 10px; }
+            `}</style>
 
-        <p className="subtitle">
-          Enter your ticket ID to check the latest status.
+      {/* THEME TOGGLE */}
+      <div style={styles.themeTogglePos} onClick={() => setIsDark(!isDark)}>
+        <div style={styles.toggleTrack(isDark)}>
+          <div style={styles.toggleKnob(isDark)}>{isDark ? "🌙" : "☀️"}</div>
+        </div>
+      </div>
+
+      <div
+        className="glass"
+        style={{
+          ...styles.card,
+          background: theme.card,
+          borderColor: theme.border,
+          color: theme.text,
+        }}
+      >
+        <h1 style={{ ...styles.title, color: theme.text }}>Track Ticket</h1>
+        <p style={{ ...styles.subtitle, color: theme.subText }}>
+          Enter ID to see live updates
         </p>
 
-        {/* Search */}
-        <form onSubmit={handleSearch} className="form">
+        <form onSubmit={handleSearch} style={styles.form}>
           <input
+            style={{
+              ...styles.input,
+              background: theme.input,
+              color: theme.text,
+              borderColor: theme.border,
+            }}
             value={ticketId}
             onChange={(e) => setTicketId(e.target.value.toUpperCase())}
-            placeholder="Ticket ID (e.g. GUEST-AB123)"
-            autoFocus
+            placeholder="GUEST-ABC123..."
           />
-
-          {error && <div className="error">{error}</div>}
-
-          <button className="primary" disabled={loading}>
-            {loading ? "Searching…" : "Track Ticket"}
+          <button type="submit" style={styles.button} disabled={loading}>
+            {loading ? "Searching..." : "Track"}
           </button>
         </form>
 
-        {/* Ticket Result */}
+        {error && <div style={styles.error}>{error}</div>}
+
         {ticket && (
-          <div className="ticket">
-            <div className="ticketHeader">
-              <span className={`status ${ticket.status.toLowerCase()}`}>
-                {ticket.status}
+          <div className="custom-scroll" style={styles.ticketBox}>
+            <div style={styles.headerRow}>
+              <span style={styles.badge(ticket.status)}>{ticket.status}</span>
+              <span style={{ fontSize: "11px", color: theme.subText }}>
+                {new Date(ticket.createdAt).toLocaleDateString()}
               </span>
-              <span className="dept">{ticket.department}</span>
             </div>
 
-            <h2>{ticket.title}</h2>
+            <h2 style={styles.ticketTitle}>{ticket.title}</h2>
 
-            <p className="desc">{ticket.description}</p>
+            <div style={styles.metaRow}>
+              <span style={{ ...styles.metaItem, color: theme.subText }}>
+                🏢 {ticket.department}
+              </span>
+              <span style={{ ...styles.metaItem, color: theme.subText }}>
+                ⚡ {ticket.priority}
+              </span>
+            </div>
 
-            <div className="timeline">
-              <div>Created: {formatDate(ticket.createdAt)}</div>
-              {ticket.resolvedAt && (
-                <div>Resolved: {formatDate(ticket.resolvedAt)}</div>
-              )}
-              {ticket.closedAt && (
-                <div>Closed: {formatDate(ticket.closedAt)}</div>
-              )}
+            <div style={{ ...styles.descBox, background: theme.input }}>
+              <p style={{ fontSize: "13px", margin: 0, lineHeight: 1.5 }}>
+                {ticket.description}
+              </p>
             </div>
 
             {ticket.aiSuggestion && (
-              <div className="ai">
-                <strong>System Suggestion</strong>
-                <p>{ticket.aiSuggestion}</p>
+              <div style={styles.aiBox}>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    color: palette.accent,
+                    margin: "0 0 4px 0",
+                  }}
+                >
+                  🤖 AI ANALYSIS
+                </p>
+                <p style={{ fontSize: "12px", margin: 0, opacity: 0.9 }}>
+                  {ticket.aiSuggestion}
+                </p>
               </div>
             )}
 
             {ticket.comments?.length > 0 && (
-              <div className="comments">
-                <h4>Comments</h4>
+              <div style={{ marginTop: "16px" }}>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    marginBottom: "8px",
+                  }}
+                >
+                  History
+                </p>
                 {ticket.comments.map((c, i) => (
-                  <div key={i} className="comment">
-                    <div className="meta">
-                      <strong>{c.by}</strong>
-                      <span>{c.role}</span>
+                  <div
+                    key={i}
+                    style={{
+                      ...styles.comment,
+                      borderLeft: `2px solid ${palette.accent}`,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: "12px" }}>
+                      {c.by}{" "}
+                      <span style={{ fontWeight: 400, opacity: 0.6 }}>
+                        ({c.role})
+                      </span>
                     </div>
-                    <p>{c.text}</p>
-                    <small>{formatDate(c.createdAt)}</small>
+                    <div style={{ fontSize: "12px", marginTop: "2px" }}>
+                      {c.text}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -129,209 +182,154 @@ function TrackTicket() {
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="nav">
-          <button onClick={() => navigate("/guest")}>Guest Page</button>
-          <button onClick={() => navigate("/")}>Login</button>
+        <div style={styles.buttonGroup}>
+          <button
+            style={{ ...styles.navBtn, color: theme.subText }}
+            onClick={() => navigate("/guest")}
+          >
+            ← Guest Page
+          </button>
+          <button
+            style={{ ...styles.navBtn, color: theme.subText }}
+            onClick={() => navigate("/")}
+          >
+            Login
+          </button>
         </div>
       </div>
-
-      {/* ===== INLINE CSS ===== */}
-      <style>{`
-        :root {
-          --bg: #f5f6f8;
-          --card: #ffffff;
-          --text: #0f172a;
-          --muted: #6b7280;
-          --primary: #6366f1;
-          --border: #e5e7eb;
-        }
-
-        [data-theme="dark"] {
-          --bg: radial-gradient(circle at top, #1e2230, #0b0d14);
-          --card: #151822;
-          --text: #e5e7eb;
-          --muted: #9ca3af;
-          --border: #1f2937;
-        }
-
-        * {
-          box-sizing: border-box;
-          font-family: -apple-system, BlinkMacSystemFont, "SF Pro", Inter, sans-serif;
-        }
-
-        .page {
-          min-height: 100vh;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          background: var(--bg);
-          padding: 20px;
-        }
-
-        .card {
-          width: 100%;
-          max-width: 620px;
-          background: var(--card);
-          border-radius: 22px;
-          padding: 28px;
-          box-shadow: 0 30px 80px rgba(0,0,0,.35);
-          animation: enter .45s ease;
-        }
-
-        @keyframes enter {
-          from { opacity: 0; transform: scale(.97) translateY(12px); }
-          to { opacity: 1; transform: none; }
-        }
-
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        h1 {
-          margin: 0;
-          font-size: 24px;
-        }
-
-        .subtitle {
-          margin: 8px 0 22px;
-          color: var(--muted);
-          font-size: 14px;
-        }
-
-        .themeToggle {
-          border: none;
-          background: transparent;
-          font-size: 18px;
-          cursor: pointer;
-          color: var(--text);
-        }
-
-        .form input {
-          width: 100%;
-          padding: 12px 14px;
-          border-radius: 14px;
-          border: 1px solid var(--border);
-          background: transparent;
-          color: var(--text);
-          margin-bottom: 12px;
-        }
-
-        .primary {
-          width: 100%;
-          padding: 12px;
-          border-radius: 999px;
-          border: none;
-          background: linear-gradient(135deg, #6366f1, #7c3aed);
-          color: white;
-          font-weight: 600;
-          cursor: pointer;
-          transition: transform .15s ease, opacity .15s;
-        }
-
-        .primary:hover { transform: translateY(-1px); }
-        .primary:disabled { opacity: .7; }
-
-        .error {
-          background: rgba(239,68,68,.15);
-          color: #ef4444;
-          padding: 8px 10px;
-          border-radius: 10px;
-          font-size: 13px;
-          margin-bottom: 10px;
-        }
-
-        .ticket {
-          margin-top: 26px;
-          padding: 20px;
-          border-radius: 18px;
-          background: rgba(255,255,255,.03);
-          animation: fade .35s ease;
-        }
-
-        @keyframes fade {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        .ticketHeader {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
-        }
-
-        .status {
-          padding: 4px 12px;
-          border-radius: 999px;
-          font-size: 12px;
-          font-weight: 600;
-          background: rgba(99,102,241,.15);
-          color: var(--primary);
-        }
-
-        h2 { margin: 10px 0; }
-
-        .desc {
-          color: var(--muted);
-          font-size: 14px;
-        }
-
-        .timeline {
-          margin: 14px 0;
-          font-size: 12px;
-          color: var(--muted);
-          display: grid;
-          gap: 4px;
-        }
-
-        .ai {
-          margin-top: 14px;
-          padding: 12px;
-          border-radius: 12px;
-          background: rgba(99,102,241,.12);
-          font-size: 13px;
-        }
-
-        .comments {
-          margin-top: 16px;
-        }
-
-        .comment {
-          padding: 12px;
-          border-radius: 12px;
-          border: 1px solid var(--border);
-          margin-top: 8px;
-          font-size: 13px;
-        }
-
-        .comment .meta {
-          display: flex;
-          gap: 8px;
-          color: var(--muted);
-          font-size: 12px;
-        }
-
-        .nav {
-          display: flex;
-          gap: 10px;
-          margin-top: 26px;
-        }
-
-        .nav button {
-          flex: 1;
-          padding: 10px;
-          border-radius: 999px;
-          border: 1px solid var(--border);
-          background: transparent;
-          color: var(--text);
-          cursor: pointer;
-        }
-      `}</style>
     </div>
   );
 }
+
+const styles = {
+  container: {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "20px",
+  },
+  themeTogglePos: {
+    position: "absolute",
+    top: "30px",
+    right: "30px",
+    cursor: "pointer",
+  },
+  toggleTrack: (dark) => ({
+    width: "48px",
+    height: "26px",
+    background: dark ? "#323234" : "#E5E5EA",
+    borderRadius: "20px",
+    padding: "2px",
+  }),
+  toggleKnob: (dark) => ({
+    width: "22px",
+    height: "22px",
+    background: "white",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "12px",
+    transform: dark ? "translateX(22px)" : "translateX(0px)",
+  }),
+
+  card: {
+    width: "100%",
+    maxWidth: "420px",
+    borderRadius: "28px",
+    border: "1px solid",
+    padding: "32px 24px",
+    boxShadow: "0 30px 60px rgba(0,0,0,0.2)",
+  },
+  title: {
+    fontSize: "24px",
+    fontWeight: "700",
+    textAlign: "center",
+    margin: 0,
+    letterSpacing: "-0.5px",
+  },
+  subtitle: {
+    fontSize: "13px",
+    textAlign: "center",
+    marginTop: "4px",
+    marginBottom: "24px",
+  },
+
+  form: { display: "flex", gap: "8px", marginBottom: "16px" },
+  input: {
+    flex: 1,
+    padding: "12px 16px",
+    borderRadius: "14px",
+    border: "1px solid",
+    fontSize: "14px",
+    outline: "none",
+  },
+  button: {
+    padding: "0 20px",
+    borderRadius: "14px",
+    border: "none",
+    background: "#0071E3",
+    color: "white",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+
+  error: {
+    background: "rgba(255, 69, 58, 0.1)",
+    color: "#FF453A",
+    padding: "10px",
+    borderRadius: "12px",
+    fontSize: "12px",
+    textAlign: "center",
+    marginBottom: "16px",
+  },
+
+  ticketBox: { maxHeight: "400px", overflowY: "auto", paddingRight: "4px" },
+  headerRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "12px",
+  },
+  badge: (status) => ({
+    padding: "4px 10px",
+    borderRadius: "8px",
+    fontSize: "10px",
+    fontWeight: "700",
+    background: status === "Resolved" ? "#32D74B" : "#FF9F0A",
+    color: "white",
+  }),
+  ticketTitle: { fontSize: "18px", fontWeight: "600", margin: "0 0 4px 0" },
+  metaRow: { display: "flex", gap: "12px", marginBottom: "16px" },
+  metaItem: { fontSize: "12px", fontWeight: "500" },
+  descBox: { padding: "12px", borderRadius: "14px", marginBottom: "12px" },
+  aiBox: {
+    padding: "12px",
+    background: "rgba(0, 113, 227, 0.1)",
+    borderRadius: "14px",
+    borderLeft: "3px solid #0071E3",
+  },
+  comment: {
+    padding: "8px 12px",
+    margin: "8px 0",
+    background: "rgba(134, 134, 139, 0.05)",
+    borderRadius: "0 10px 10px 0",
+  },
+
+  buttonGroup: {
+    marginTop: "24px",
+    display: "flex",
+    justifyContent: "center",
+    gap: "20px",
+  },
+  navBtn: {
+    background: "none",
+    border: "none",
+    fontSize: "13px",
+    fontWeight: "500",
+    cursor: "pointer",
+  },
+};
 
 export default TrackTicket;

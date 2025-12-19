@@ -1,335 +1,273 @@
-import { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 
 function GuestTicket() {
+  const [isDark, setIsDark] = useState(true);
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    department: "Academics",
+  });
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [trackingId, setTrackingId] = useState("");
   const navigate = useNavigate();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [department, setDepartment] = useState("Academics");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const palette = {
+    bg: isDark ? "#122330" : "#E5E5EA", // Deepest layer
+    card: isDark ? "#1B3C53" : "#FFFFFF", // Floating layer
+    text: isDark ? "#E3E3E3" : "#1B3C53",
+    inputBg: isDark ? "rgba(0, 0, 0, 0.2)" : "#F2F2F7",
+    accent: "#456882",
+    btnPrimary: "#234C6A",
+    appleBlue: "#007AFF",
+  };
 
-  const [trackingId, setTrackingId] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-
-  const [theme, setTheme] = useState(
-    localStorage.getItem("guest-theme") || "light"
-  );
-
-  /* ===========================
-     GLOBAL THEME APPLY
-  ============================ */
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    document.body.style.margin = "0";
-    document.body.style.background =
-      theme === "dark"
-        ? "radial-gradient(circle at top, #1e2230, #0b0d14)"
-        : "linear-gradient(135deg,#eef2ff,#ffffff)";
-    localStorage.setItem("guest-theme", theme);
-  }, [theme]);
-
-  /* ===========================
-     SUBMIT HANDLER
-  ============================ */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("");
     setLoading(true);
-
     try {
-      const res = await axios.post("http://localhost:5000/api/guest-tickets", {
-        title,
-        description,
-        department,
-      });
-
-      setTrackingId(res.data.trackingId);
+      const res = await axios.post(
+        "http://localhost:5000/api/guest-tickets",
+        formData
+      );
+      setTrackingId(res.data?.trackingId || "GUEST-ERROR");
       setSubmitted(true);
-      setTitle("");
-      setDescription("");
-    } catch {
-      setMessage("Failed to submit query. Please try again.");
+    } catch (err) {
+      alert("Submission failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(trackingId);
-  };
-
-  const styles = getStyles(theme);
-
   return (
-    <div style={styles.page}>
-      {/* Theme Toggle */}
-      <button
-        style={styles.themeToggle}
-        onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-        aria-label="Toggle theme"
-      >
-        {theme === "light" ? "Dark" : "Light"}
-      </button>
+    <div
+      style={{
+        ...styles.viewport,
+        backgroundColor: palette.bg,
+        color: palette.text,
+      }}
+    >
+      <style>
+        {`
+          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+          * { font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif; box-sizing: border-box; transition: background 0.3s ease; }
+          
+          .compact-card {
+            background: ${palette.card};
+            width: 100%;
+            max-width: 440px; /* More compact width */
+            padding: 35px 40px;
+            border-radius: 28px;
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.45);
+            border: 1px solid ${
+              isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"
+            };
+            animation: slideUp 0.5s ease-out;
+          }
 
-      <AnimatePresence mode="wait">
-        {submitted ? (
-          <motion.div
-            key="success"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            style={styles.card}
-          >
-            <div style={styles.successIcon}>✓</div>
+          .apple-input {
+            width: 100%;
+            background: ${palette.inputBg};
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 12px 14px;
+            color: ${palette.text};
+            font-size: 14px;
+            outline: none;
+            transition: border 0.2s ease;
+          }
+          .apple-input:focus { border-color: ${
+            palette.appleBlue
+          }; background: ${isDark ? "#000" : "#FFF"}; }
 
-            <h1 style={styles.title}>Query Submitted</h1>
-            <p style={styles.subtitle}>
-              Save this tracking ID to track your request.
-            </p>
+          .btn-login {
+            width: 100%;
+            background: ${palette.btnPrimary};
+            color: white;
+            border: none;
+            border-radius: 14px;
+            padding: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: all 0.2s ease;
+          }
+          .btn-login:hover { filter: brightness(1.2); transform: scale(0.99); }
 
-            <div style={styles.trackingBox}>
-              <input style={styles.trackingInput} value={trackingId} readOnly />
-              <button style={styles.copyBtn} onClick={handleCopy}>
-                Copy
-              </button>
-            </div>
+          .toggle-btn {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            opacity: 0.7;
+          }
+          .switch {
+            width: 40px;
+            height: 22px;
+            background: ${isDark ? palette.appleBlue : "#D1D1D6"};
+            border-radius: 20px;
+            position: relative;
+          }
+          .knob {
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: ${isDark ? "20px" : "2px"};
+            transition: 0.2s;
+          }
 
-            <button
-              style={styles.primaryBtn}
-              onClick={() => navigate("/track", { state: { trackingId } })}
-            >
-              Track Query
-            </button>
+          @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        `}
+      </style>
 
-            <button
-              style={styles.secondaryBtn}
-              onClick={() => setSubmitted(false)}
-            >
-              Submit Another
-            </button>
+      {/* THEME TOGGLE */}
+      <div className="toggle-btn" onClick={() => setIsDark(!isDark)}>
+        <span>{isDark ? "Dark Mode" : "Light Mode"}</span>
+        <div className="switch">
+          <div className="knob" />
+        </div>
+      </div>
 
-            <button style={styles.linkBtn} onClick={() => navigate("/")}>
-              Back to Login
-            </button>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="form"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-            style={styles.card}
-          >
-            <h1 style={styles.title}>QueryConnect</h1>
-            <p style={styles.subtitle}>Anonymous Guest Query</p>
+      <div className="compact-card">
+        {!submitted ? (
+          <>
+            <h1 style={styles.logo}>QueryConnect</h1>
+            <p style={styles.subtitle}>Welcome back!</p>
 
-            <form onSubmit={handleSubmit} style={styles.form}>
+            <form onSubmit={handleSubmit} style={{ marginTop: "25px" }}>
               <input
-                style={styles.input}
+                className="apple-input"
                 placeholder="Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                style={{ marginBottom: "12px" }}
                 required
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
               />
 
-              <textarea
-                style={{ ...styles.input, height: 90 }}
-                placeholder="Describe your issue"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-              />
+              <div style={{ position: "relative", marginBottom: "12px" }}>
+                <textarea
+                  className="apple-input"
+                  style={{ height: "90px", resize: "none" }}
+                  placeholder="Describe your query..."
+                  required
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                />
+                <span style={styles.showText}>Show</span>
+              </div>
 
-              <select
-                style={styles.input}
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-              >
-                {[
-                  "Academics",
-                  "Hostel",
-                  "Library",
-                  "IT",
-                  "Administration",
-                  "Sports",
-                  "Transport",
-                ].map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </select>
-
-              {message && <div style={styles.error}>{message}</div>}
-
-              <button style={styles.primaryBtn} disabled={loading}>
-                {loading ? "Submitting…" : "Submit Query"}
+              <button type="submit" className="btn-login" disabled={loading}>
+                {loading ? "..." : "Login"}
               </button>
             </form>
 
-            <div style={styles.trackRow}>
-              <input
-                style={styles.input}
-                placeholder="Tracking ID"
-                value={trackingId}
-                onChange={(e) => setTrackingId(e.target.value)}
-              />
-              <button
-                style={styles.trackBtn}
-                onClick={() => navigate("/track", { state: { trackingId } })}
+            <div style={styles.footer}>
+              <div style={styles.footerLink}>
+                New here? <b style={{ color: palette.text }}>Register</b>
+              </div>
+              <div style={styles.footerLink} onClick={() => navigate("/")}>
+                Or <b style={{ color: palette.text }}>Back to login</b>
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  opacity: 0.4,
+                  marginTop: "12px",
+                  cursor: "pointer",
+                }}
               >
-                Track
-              </button>
+                Show test accounts
+              </div>
             </div>
-
-            <button style={styles.linkBtn} onClick={() => navigate("/")}>
-              Back to Login
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "10px 0" }}>
+            <div style={styles.successBadge}>✓</div>
+            <h3 style={{ margin: "10px 0" }}>Query Sent</h3>
+            <div style={styles.trackCode}>{trackingId}</div>
+            <button className="btn-login" onClick={() => navigate("/track")}>
+              Track Now
             </button>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
     </div>
   );
 }
 
-/* ===========================
-   STYLES
-=========================== */
-function getStyles(theme) {
-  const dark = theme === "dark";
-
-  return {
-    page: {
-      position: "fixed",
-      inset: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 24,
-      fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-    },
-    themeToggle: {
-      position: "absolute",
-      top: 20,
-      right: 20,
-      borderRadius: 999,
-      padding: "8px 14px",
-      border: "1px solid #e5e7eb",
-      background: dark ? "#0b0d14" : "#ffffff",
-      color: dark ? "#fff" : "#111",
-      cursor: "pointer",
-      fontSize: 13,
-    },
-    card: {
-      width: "100%",
-      maxWidth: 420,
-      background: dark ? "#0b0d14" : "#ffffff",
-      borderRadius: 20,
-      padding: 28,
-      boxShadow: "0 40px 80px rgba(0,0,0,0.35)",
-      textAlign: "center",
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: 700,
-      color: dark ? "#ffffff" : "#111827",
-    },
-    subtitle: {
-      fontSize: 14,
-      color: dark ? "#9ca3af" : "#6b7280",
-      marginBottom: 16,
-    },
-    form: { display: "flex", flexDirection: "column", gap: 12 },
-    input: {
-      padding: 12,
-      borderRadius: 12,
-      border: dark ? "1px solid #1f2933" : "1px solid #e5e7eb",
-      background: dark ? "#020617" : "#f9fafb",
-      color: dark ? "#ffffff" : "#111",
-    },
-    primaryBtn: {
-      marginTop: 8,
-      padding: 12,
-      borderRadius: 999,
-      border: "none",
-      background: "#4f46e5",
-      color: "#ffffff",
-      fontWeight: 600,
-      cursor: "pointer",
-    },
-    secondaryBtn: {
-      marginTop: 8,
-      padding: 12,
-      borderRadius: 999,
-      border: "none",
-      background: dark ? "#1f2933" : "#e5e7eb",
-      color: dark ? "#fff" : "#111",
-      cursor: "pointer",
-    },
-    linkBtn: {
-      marginTop: 12,
-      background: "none",
-      border: "none",
-      color: "#6366f1",
-      cursor: "pointer",
-      fontSize: 14,
-    },
-    trackRow: {
-      display: "flex",
-      gap: 8,
-      marginTop: 16,
-    },
-    trackBtn: {
-      padding: "10px 16px",
-      borderRadius: 12,
-      border: "none",
-      background: "#4f46e5",
-      color: "#fff",
-      cursor: "pointer",
-    },
-    successIcon: {
-      width: 60,
-      height: 60,
-      borderRadius: "50%",
-      background: "#22c55e",
-      color: "#ffffff",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 28,
-      margin: "0 auto 12px",
-    },
-    trackingBox: {
-      display: "flex",
-      gap: 8,
-      marginTop: 16,
-    },
-    trackingInput: {
-      flex: 1,
-      padding: 12,
-      borderRadius: 999,
-      border: "1px solid #e5e7eb",
-    },
-    copyBtn: {
-      padding: "10px 14px",
-      borderRadius: 999,
-      background: "#4f46e5",
-      color: "#ffffff",
-      border: "none",
-      cursor: "pointer",
-    },
-    error: {
-      background: "#fee2e2",
-      color: "#b91c1c",
-      padding: 8,
-      borderRadius: 8,
-      fontSize: 13,
-    },
-  };
-}
+const styles = {
+  viewport: {
+    width: "100vw",
+    height: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  logo: {
+    fontSize: "28px",
+    fontWeight: "800",
+    margin: 0,
+    textAlign: "center",
+    letterSpacing: "-0.8px",
+  },
+  subtitle: {
+    fontSize: "14px",
+    opacity: 0.5,
+    textAlign: "center",
+    marginTop: "4px",
+  },
+  showText: {
+    position: "absolute",
+    right: "15px",
+    top: "12px",
+    fontSize: "12px",
+    fontWeight: "700",
+    opacity: 0.6,
+    cursor: "pointer",
+  },
+  footer: {
+    marginTop: "20px",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  },
+  footerLink: { fontSize: "13px", opacity: 0.6, cursor: "pointer" },
+  successBadge: {
+    width: "50px",
+    height: "50px",
+    background: "#34C759",
+    borderRadius: "50%",
+    color: "white",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "24px",
+    margin: "0 auto",
+  },
+  trackCode: {
+    fontSize: "18px",
+    fontWeight: "800",
+    padding: "15px",
+    background: "rgba(0,0,0,0.1)",
+    borderRadius: "12px",
+    margin: "15px 0",
+    letterSpacing: "1px",
+  },
+};
 
 export default GuestTicket;

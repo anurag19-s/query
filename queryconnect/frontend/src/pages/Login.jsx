@@ -1,313 +1,336 @@
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 function Login({ setUser }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
+  const [name, setName] = useState("");
   const [showTests, setShowTests] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [dark, setDark] = useState(false);
 
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return;
-
     setError("");
-    setLoading(true);
 
     try {
       const endpoint = isRegister ? "/api/register" : "/api/login";
       const payload = isRegister
         ? { email, password, name }
         : { email, password };
-
       const res = await axios.post(`http://localhost:5000${endpoint}`, payload);
 
       if (isRegister) {
+        alert("Registration successful! Please login.");
         setIsRegister(false);
         setName("");
       } else {
-        setSuccess(true);
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+        setUser(res.data.user);
 
-        setTimeout(() => {
-          localStorage.setItem("token", res.data.token);
-          localStorage.setItem("user", JSON.stringify(res.data.user));
-          setUser(res.data.user);
-
-          if (res.data.user.role === "student") navigate("/student");
-          else if (res.data.user.role === "department") navigate("/department");
-          else navigate("/admin");
-        }, 700);
+        if (res.data.user.role === "student") navigate("/student");
+        else if (res.data.user.role === "department") navigate("/department");
+        else navigate("/admin");
       }
     } catch (err) {
       setError(
         err.response?.data?.message ||
           err.response?.data?.error ||
-          "Login failed"
+          "Something went wrong"
       );
-    } finally {
-      setLoading(false);
     }
   };
 
-  return (
-    <div style={styles.container}>
+  const renderField = (
+    label,
+    value,
+    setValue,
+    type = "text",
+    showToggle = false,
+    index = 0
+  ) => {
+    const hasValue = value.length > 0;
+
+    return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        style={styles.glow}
-      />
-
-      <AnimatePresence mode="wait">
-        {!success && (
-          <motion.div
-            key="card"
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.92 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            style={styles.card}
+        style={{ marginBottom: 16, width: "100%" }}
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.1, duration: 0.3 }}
+      >
+        <div style={{ position: "relative", width: "100%" }}>
+          <input
+            type={type}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            required
+            style={{
+              width: "100%",
+              height: 42,
+              padding: "5px 5px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: dark ? "rgba(255,255,255,0.05)" : "#f2f2f5",
+              boxShadow: dark
+                ? "inset 0 1px 3px rgba(255,255,255,0.1)"
+                : "inset 0 1px 3px rgba(0,0,0,0.05)",
+              fontSize: 14,
+              outline: "none",
+              transition: "all 0.3s ease",
+              textAlign: "center",
+            }}
+            onFocus={(e) =>
+              (e.target.style.boxShadow = dark
+                ? "0 0 0 2px rgba(27,60,83,0.5)"
+                : "0 0 0 2px rgba(27,60,83,0.2)")
+            }
+            onBlur={(e) =>
+              (e.target.style.boxShadow = dark
+                ? "inset 0 1px 3px rgba(255,255,255,0.1)"
+                : "inset 0 1px 3px rgba(0,0,0,0.05)")
+            }
+          />
+          <label
+            style={{
+              position: "absolute",
+              left: 16,
+              top: hasValue ? -8 : "50%",
+              fontSize: hasValue ? 12 : 14,
+              color: hasValue ? "#1B3C53" : "#64748b",
+              transform: hasValue ? "translateY(0)" : "translateY(-50%)",
+              transition: "all 0.2s ease",
+              background: dark ? "#020617" : "#ffffff",
+              padding: "0 4px",
+              pointerEvents: "none",
+            }}
           >
-            <h1 style={styles.title}>QueryConnect</h1>
-            <p style={styles.subtitle}>
-              {isRegister ? "Create your account" : "Welcome back"}
-            </p>
-
-            <form onSubmit={handleSubmit} style={styles.form}>
-              <AnimatePresence>
-                {isRegister && (
-                  <motion.input
-                    key="name"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    style={styles.input}
-                    placeholder="Full name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                )}
-              </AnimatePresence>
-
-              <input
-                style={styles.input}
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoFocus
-                required
-              />
-
-              <input
-                style={styles.input}
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-
-              {error && <div style={styles.error}>{error}</div>}
-
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                whileHover={{ scale: 1.02 }}
-                disabled={loading}
-                type="submit"
-                style={{
-                  ...styles.button,
-                  opacity: loading ? 0.7 : 1,
-                }}
-              >
-                {loading ? "Please wait..." : isRegister ? "Register" : "Login"}
-              </motion.button>
-            </form>
-
-            <div style={styles.switch}>
-              <span
-                tabIndex={0}
-                onClick={() => setIsRegister(!isRegister)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && setIsRegister(!isRegister)
-                }
-              >
-                {isRegister ? "Already have an account?" : "Create account"}
-              </span>
-
-              <span
-                tabIndex={0}
-                onClick={() => navigate("/guest")}
-                onKeyDown={(e) => e.key === "Enter" && navigate("/guest")}
-              >
-                Continue as guest
-              </span>
-            </div>
-
-            <div
-              style={styles.testToggle}
-              tabIndex={0}
-              onClick={() => setShowTests(!showTests)}
-              onKeyDown={(e) => e.key === "Enter" && setShowTests(!showTests)}
+            {label}
+          </label>
+          {showToggle && (
+            <button
+              type="button"
+              style={{
+                position: "absolute",
+                right: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "transparent",
+                border: "none",
+                color: "#1B3C53",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+              onClick={() => setShowPassword(!showPassword)}
             >
-              {showTests ? "Hide test accounts" : "Show test accounts"}
-            </div>
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
 
-            <AnimatePresence>
-              {showTests && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
-                  style={styles.infoBox}
-                >
-                  <p>Student: ankush.mahadole.mca25@mespune.in</p>
-                  <p>IT Dept: it@mespune.in</p>
-                  <p>Admin: admin@mespune.in</p>
-                  <p style={{ opacity: 0.6 }}>Password: 123456</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
+  return (
+    <div
+      style={{
+        ...styles.page,
+        background: dark ? "#0f172a" : "#E3E3E3",
+      }}
+    >
+      <motion.div
+        style={{
+          ...styles.card,
+          background: dark ? "#020617" : "#ffffff",
+        }}
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        whileHover={{
+          scale: 1.02,
+          boxShadow: dark
+            ? "0 20px 40px rgba(255,255,255,0.05)"
+            : "0 20px 40px rgba(0,0,0,0.15)",
+        }}
+      >
+        <div style={styles.themeToggle} onClick={() => setDark(!dark)}>
+          {dark ? "Light Mode" : "Dark Mode"}
+        </div>
 
-        {success && (
-          <motion.div
-            key="success"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            style={styles.success}
+        <h1 style={{ ...styles.title, color: dark ? "#e5e7eb" : "#1B3C53" }}>
+          QueryConnect
+        </h1>
+
+        <p style={{ ...styles.subtitle, color: dark ? "#94a3b8" : "#456882" }}>
+          {isRegister ? "Create Account" : "Welcome back!"}
+        </p>
+
+        <form onSubmit={handleSubmit} style={styles.form}>
+          {isRegister &&
+            renderField("Full Name", name, setName, "text", false, 0)}
+          {renderField("Email", email, setEmail, "email", false, 1)}
+          {renderField(
+            "Password",
+            password,
+            setPassword,
+            showPassword ? "text" : "password",
+            true,
+            2
+          )}
+
+          {error && <div style={styles.error}>{error}</div>}
+
+          <motion.button
+            style={styles.button}
+            type="submit"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
           >
-            Signing you in…
+            {isRegister ? "Register" : "Login"}
+          </motion.button>
+        </form>
+
+        <p style={styles.text}>
+          {isRegister ? "Already have an account?" : "New here?"}{" "}
+          <span
+            style={styles.link}
+            onClick={() => {
+              setIsRegister(!isRegister);
+              setError("");
+              setName("");
+            }}
+          >
+            {isRegister ? "Login" : "Register"}
+          </span>
+        </p>
+
+        <p style={styles.text}>
+          Or{" "}
+          <span style={styles.link} onClick={() => navigate("/guest")}>
+            continue as guest
+          </span>
+        </p>
+
+        <p style={styles.testToggle} onClick={() => setShowTests(!showTests)}>
+          {showTests ? "Hide test accounts" : "Show test accounts"}
+        </p>
+
+        {showTests && (
+          <motion.div
+            style={styles.testBox}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <p>Student: ankush.mahadole.mca25@mespune.in</p>
+            <p>IT Dept: it@mespune.in</p>
+            <p>Academics: academics@mespune.in</p>
+            <p>Admin: admin@mespune.in</p>
+            <p>Password: 123456</p>
           </motion.div>
         )}
-      </AnimatePresence>
+      </motion.div>
     </div>
   );
 }
 
-/* ===================== STYLES ===================== */
-
 const styles = {
-  container: {
-    minHeight: "100vh",
+  page: {
+    height: "100vh",
     width: "100vw",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "radial-gradient(circle at top, #2b2f3a, #0b0d12)",
-    fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-    overflow: "hidden",
+    fontFamily: "'SF Pro', 'Segoe UI', sans-serif",
+    position: "relative",
   },
-
-  glow: {
-    position: "absolute",
-    width: "520px",
-    height: "520px",
-    background: "radial-gradient(circle, rgba(124,58,237,0.35), transparent)",
-    filter: "blur(90px)",
-  },
-
   card: {
-    width: "380px",
-    padding: "30px",
-    borderRadius: "22px",
-    background: "rgba(18,20,28,0.92)",
-    backdropFilter: "blur(20px)",
-    boxShadow: "0 40px 100px rgba(0,0,0,0.7)",
-    zIndex: 2,
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 18,
+    padding: "28px 24px",
+    boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+    position: "relative",
   },
-
   title: {
     textAlign: "center",
-    color: "#c4b5fd",
-    fontSize: "28px",
+    fontSize: 26,
     fontWeight: 700,
-    margin: 0,
+    marginBottom: 6,
   },
-
   subtitle: {
     textAlign: "center",
-    color: "#9ca3af",
-    fontSize: "13px",
-    marginBottom: "22px",
+    fontSize: 13,
+    marginBottom: 18,
   },
-
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: "14px",
+    gap: 16,
   },
-
-  input: {
-    padding: "12px",
-    borderRadius: "10px",
-    background: "#0f1117",
-    border: "1px solid #1f2430",
-    color: "#e5e7eb",
-    fontSize: "14px",
-    outline: "none",
-  },
-
   button: {
-    marginTop: "6px",
-    padding: "12px",
-    borderRadius: "999px",
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 999,
     border: "none",
-    background: "linear-gradient(135deg, #7c3aed, #6366f1)",
-    color: "#fff",
+    background: "#1B3C53",
+    color: "#ffffff",
+    fontSize: 15,
     fontWeight: 600,
     cursor: "pointer",
+    boxShadow: "0 4px 10px rgba(27,60,83,0.2)",
+    transition: "all 0.2s ease",
   },
-
   error: {
-    background: "rgba(239,68,68,0.15)",
-    color: "#fca5a5",
-    padding: "8px",
-    borderRadius: "8px",
-    fontSize: "12px",
-  },
-
-  switch: {
-    marginTop: "16px",
-    display: "flex",
-    justifyContent: "space-between",
-    fontSize: "13px",
-    color: "#a78bfa",
-    cursor: "pointer",
-  },
-
-  testToggle: {
-    marginTop: "16px",
-    fontSize: "12px",
+    background: "#fee2e2",
+    color: "#991b1b",
+    padding: 8,
+    borderRadius: 10,
+    fontSize: 12,
     textAlign: "center",
-    color: "#9ca3af",
+    marginTop: 6,
+  },
+  text: {
+    marginTop: 12,
+    textAlign: "center",
+    fontSize: 12,
+    color: "#456882",
+  },
+  link: {
+    color: "#1B3C53",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "color 0.2s ease",
+  },
+  testToggle: {
+    marginTop: 12,
+    textAlign: "center",
+    fontSize: 11,
+    color: "#1B3C53",
     cursor: "pointer",
   },
-
-  infoBox: {
-    marginTop: "12px",
-    padding: "10px",
-    borderRadius: "10px",
-    background: "#0f1117",
-    fontSize: "12px",
-    color: "#9ca3af",
+  testBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    background: "#f9fafb",
+    fontSize: 11,
+    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
   },
-
-  success: {
-    color: "#c4b5fd",
-    fontSize: "18px",
-    fontWeight: 600,
+  themeToggle: {
+    position: "absolute",
+    top: 12,
+    right: 16,
+    fontSize: 12,
+    cursor: "pointer",
+    color: "#64748b",
   },
 };
 
